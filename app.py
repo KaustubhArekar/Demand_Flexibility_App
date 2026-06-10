@@ -163,7 +163,6 @@ with c1:
         status_text.text(st.success("Analysis Completed successfully!"))
 
           
-print(np.array(st.session_state["total_cost_sum"].values).flatten(),np.array(st.session_state["flex"]))
 
 
 c1,c2=st.columns([1,1])           
