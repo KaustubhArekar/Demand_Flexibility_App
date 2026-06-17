@@ -5,24 +5,7 @@ def analyze_high_cost_contributors(meter_data, pu_gen_cost, high_cost_percentile
     import pandas as pd
     import numpy as np
     import streamlit as st
-    """
-    Analyze meter/consumer contribution to high-cost periods
-    
-    Parameters:
-    -----------
-    meter_data : pd.DataFrame
-        Shape (8760, 100) - Rows = time slots, Columns = meter numbers (100 meters)
-    pu_gen_cost : pd.DataFrame or pd.Series
-        Shape (8760, 1) or (8760,) - Hourly generation cost
-    high_cost_percentile : int
-        Percentile threshold to define high-cost periods (default: 75)
-    
-    Returns:
-    --------
-    pd.DataFrame : Analysis table with all meters and their metrics
-    float : Cost threshold value
-    int : Number of high-cost hours
-    """
+ 
     
     # Ensure pu_gen_cost is a 1D array
     if isinstance(pu_gen_cost, pd.DataFrame):
@@ -79,8 +62,8 @@ def analyze_high_cost_contributors(meter_data, pu_gen_cost, high_cost_percentile
             'Pct_of_Peak_in_High_Cost_%': round(pct_of_peak_during_high_cost, 1),
             'High_Cost_Avg_MW': round(high_cost_avg, 2),
             'High_Cost_Peak_MW': round(high_cost_peak, 2),
-            'Total_Cost_Impact_₹': round(total_cost_impact, 0),
-            'High_Cost_Impact_₹': round(high_cost_impact, 0),
+            # 'Total_Cost_Impact_₹': round(total_cost_impact, 0),
+            # 'High_Cost_Impact_₹': round(high_cost_impact, 0),
             'Risk_Score': round(risk_score, 1)
         })
     

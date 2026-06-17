@@ -17,14 +17,14 @@ import plotly.express as px
 
 import matplotlib.pyplot as plt
 import numpy as np  
-import generation_cost2
+# import generation_cost2
 
 import os
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
 
-st.title("Step 2: View Charts")
+st.title("Consumer demand analysis for high-cost periods")
 
                 
 file_path = st.text_input(

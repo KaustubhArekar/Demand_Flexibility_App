@@ -67,13 +67,13 @@ if all(uploaded_data.values()):
 
             # Parsing specific variables
             st.session_state['flex'] = ast.literal_eval(get_param('flexibility'))
-            st.session_state['base_incenitve_DF'] = float(get_param('base_incenitve_DF'))
-            st.session_state['base_incenitve_DR'] = float(get_param('base_incenitve_DR'))
+            # st.session_state['base_incenitve_DF'] = float(get_param('base_incenitve_DF'))
+            # st.session_state['base_incenitve_DR'] = float(get_param('base_incenitve_DR'))
             st.session_state['battery_energy_capacity'] = float(get_param('battery_energy_capacity'))
-            st.session_state['clusters_rqd'] = ast.literal_eval(get_param('clusters_rqd'))
+            # st.session_state['clusters_rqd'] = ast.literal_eval(get_param('clusters_rqd'))
             st.session_state['num_slots'] = int(len(st.session_state['demand']))
-            st.session_state['mode'] = ast.literal_eval(get_param('mode'))
-            st.session_state['inconvenience_cost'] = ast.literal_eval(get_param('inconvenience_cost'))
+            # st.session_state['mode'] = ast.literal_eval(get_param('mode'))
+            # st.session_state['inconvenience_cost'] = ast.literal_eval(get_param('inconvenience_cost'))
             st.session_state['output_folder_name'] = get_param('Output Folder Name')
             st.session_state['solar_pu_cost'] = float(get_param('solar_pu_cost'))
             st.session_state['wind_pu_cost'] = float(get_param('wind_pu_cost'))
@@ -82,7 +82,8 @@ if all(uploaded_data.values()):
             st.session_state['battery_initial_state'] = float(get_param('battery_initial_state'))
             st.session_state['Re_forecast'] = ast.literal_eval(get_param('RE_forecasting'))
             st.session_state['Daily_slots'] = int(float(get_param('daily_slots')))
-            
+            st.session_state['max_daily_shift'] = float(get_param('limit_on_totalshift'))
+
             st.sidebar.success("Data successfully initialized!")
 
         except Exception as e:
@@ -107,6 +108,7 @@ with c1:
         st.session_state["schedule_gen"] = pd.DataFrame(index=range(st.session_state.num_slots))
         st.session_state["market_power"] = pd.DataFrame(index=range(st.session_state.num_slots))
         st.session_state["Battery"] = pd.DataFrame(index=range(st.session_state.num_slots))
+        st.session_state["generators_schedule"] = {}
 
     # Use a spinner for visual feedback
         with st.spinner("Running optimization model..."):
@@ -135,9 +137,10 @@ with c1:
                 st.session_state.output_folder_name,
                 st.session_state.num_slots,
                 st.session_state.Daily_slots,
-                st.session_state.availability
+                st.session_state.availability,
+                st.session_state.max_daily_shift
             )
-            
+                print(schedule_gen)
             # Store results in session state DataFrames
                 st.session_state["pu_gen_cost_flex"][flex] = pu_gen_cost
                 st.session_state["total_cost_flex"][flex] = total_cost
@@ -146,6 +149,7 @@ with c1:
                 st.session_state["Battery"][flex]=battery_profile
                 st.session_state["market_power"][flex]=market_power
                 st.session_state["schedule_gen"][flex]=schedule_gen.sum(axis=1)
+                st.session_state["generators_schedule"][flex]=schedule_gen
             
             # Update progress bar and status text
                 progress_bar.progress((i + 1) / len(st.session_state.flex))
@@ -153,7 +157,7 @@ with c1:
                 i=i+1
         
 
-                
+        print(st.session_state["generators_schedule"][flex] )       
         st.success("Analysis Completed successfully!")
     
         st.rerun() 
@@ -230,15 +234,15 @@ with c2:
             st.subheader("Summary")
             data = pd.DataFrame(index = range(len(st.session_state.flex)), columns=['Flexibility','Total Cost (Million INR)', 'Total Cost Savings (Million INR)', '% Cost Savings'])
             for i, flex in enumerate(st.session_state.flex):
-                total_cost = st.session_state["total_cost_sum"].loc[flex, 'total_cost_sum']
-                total_cost_saving = st.session_state["total_cost_sum"].loc[0, 'total_cost_sum'] - total_cost
+                total_cost = round(st.session_state["total_cost_sum"].loc[flex, 'total_cost_sum'],0)
+                total_cost_saving = round(st.session_state["total_cost_sum"].loc[0, 'total_cost_sum'] - total_cost,0)
                 percent_saving = (total_cost_saving / st.session_state["total_cost_sum"].loc[0, 'total_cost_sum']) * 100
     
                 data.loc[i] = [flex, total_cost, total_cost_saving, percent_saving]
 
             
       
-            st.dataframe(data,hide_index=True,height=300,use_container_width=True)
+            st.dataframe(data,hide_index=True,use_container_width=True)
       
 
         

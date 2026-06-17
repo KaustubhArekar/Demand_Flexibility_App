@@ -33,7 +33,7 @@ if st.session_state.get("pu_gen_cost_flex") is None:
 
 
 
-
+num_slots = st.session_state.get("num_slots")
 
 c11,c12=st.columns([1,1])
 with c11:
@@ -158,9 +158,9 @@ if "DF_pu_savings" in st.session_state:
                 daily_slots = st.session_state.get("Daily_slots", 24)  # Default to 24 if not set
             
             # Create cost matrix
-                cost_matrix = pd.DataFrame(columns=range(365), index=range(daily_slots))
+                cost_matrix = pd.DataFrame(columns=range(num_slots//daily_slots), index=range(daily_slots))
                 data = df1.values
-                for i in range(365):
+                for i in range(num_slots//daily_slots):
                     start_idx = i * daily_slots
                     end_idx = (i + 1) * daily_slots
             
@@ -234,11 +234,12 @@ if "DF_pu_savings" in st.session_state:
                     st.plotly_chart(fig, use_container_width=True)
                 
     with dfcs2:
-                savings_matrix = pd.DataFrame(columns=range(365), index=range(daily_slots))
-                data = st.session_state["DF_pu_savings"][selected_flex]
+                savings_matrix = pd.DataFrame(columns=range(num_slots//daily_slots), index=range(daily_slots))
+                data = (10**3)*st.session_state["DF_pu_savings"][selected_flex]
+
                 # data =st.session_state['pu_gen_cost_flex'][0].values - st.session_state['pu_gen_cost_flex'][selected_flex].values
                 # data =st.session_state['pu_gen_cost_flex'][selected_flex].values
-                for i in range(365):
+                for i in range(num_slots//daily_slots):
                     start_idx = i * daily_slots
                     end_idx = (i + 1) * daily_slots
 

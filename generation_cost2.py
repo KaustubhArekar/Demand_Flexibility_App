@@ -1,4 +1,4 @@
-def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_capacity, battery_power_capacity, battery_initial_state, solar_pu_cost, wind_pu_cost,market_limit, output_folder_name, num_slots, daily_slots,availability):    
+def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_capacity, battery_power_capacity, battery_initial_state, solar_pu_cost, wind_pu_cost,market_limit, output_folder_name, num_slots, daily_slots,availability, max_daily_shift):    
     #RE Power generation profiles
     from datetime import datetime, date, time, timedelta
 
@@ -45,8 +45,7 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
     
 
     num_plants=len(generation_capacity)
-    num_hours=len(demand.values)
-#     print(num_hours)
+   
   
 # --------------------------------------------------------------------------------
 
@@ -54,85 +53,83 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
 
     # Define the decision variables
     schedule = [[LpVariable(f"Schedule_{t}_{p}") for p in range(num_plants)] 
-                for t in range(num_hours)]
+                for t in range(num_slots)]
     del_schedule = [[LpVariable(f"del_Schedule_{t}_{p}") for p in range(num_plants)] 
-                for t in range(num_hours)]
-    market_drawl = [LpVariable(f"Market_{t}", lowBound=0) for t in range(num_hours)]
-    optimised_demand = [LpVariable(f"opt_demand_{t}") for t in range(num_hours)]
-    del_optimised_demand = [LpVariable(f"del_opt_demand_{t}") for t in range(num_hours)]
+                for t in range(num_slots)]
+    market_drawl = [LpVariable(f"Market_{t}", lowBound=0) for t in range(num_slots)]
+    optimised_demand = [LpVariable(f"opt_demand_{t}") for t in range(num_slots)]
+    del_optimised_demand = [LpVariable(f"del_opt_demand_{t}") for t in range(num_slots)]
     
-    b_soc = [LpVariable(f"b_soc_{t}",lowBound=0.10*battery_energy_capacity, upBound = battery_energy_capacity) for t in range(num_hours+1)]
-    b_power = [LpVariable(f"b_power_{t}",lowBound=-battery_power_capacity, upBound = battery_power_capacity) for t in range(num_hours)]
-    total_shift = [LpVariable(f"{t}_total_shift") for t in range(num_hours)] 
-    # availability= [[LpVariable(f"availability_{t}_{p}", cat='Binary') for p in range(num_plants)] for t in range(num_hours)] 
+    b_soc = [LpVariable(f"b_soc_{t}",lowBound=0.10*battery_energy_capacity, upBound = battery_energy_capacity) for t in range(num_slots+1)]
+    b_power = [LpVariable(f"b_power_{t}",lowBound=-battery_power_capacity, upBound = battery_power_capacity) for t in range(num_slots)]
+    total_shift = [LpVariable(f"{t}_total_shift") for t in range(num_slots)] 
+    # availability= [[LpVariable(f"availability_{t}_{p}", cat='Binary') for p in range(num_plants)] for t in range(num_slots)] 
     # set initial battery state of charge
     problem += b_soc[0] == battery_initial_state
                
    
     
     # Set the objective function
-    problem += lpSum(schedule[t][p] * Variable_cost[p] for t in range(num_hours) for p in range(num_plants))+lpSum(market_drawl[t]*market_price['rate'][t] for t in range(num_hours))
+    problem += lpSum(schedule[t][p] * Variable_cost[p] for t in range(num_slots) for p in range(num_plants))+lpSum(market_drawl[t]*market_price['rate'][t] for t in range(num_slots))
 
     
     # Add the constraints
 
     #Constraint 1  - ramping up and down constraints 1% for thermal, 3% for gas, 10% for hydro
-    for t in range(num_hours - 1):
+    for t in range(num_slots - 1):
         for p in range(num_plants):
             problem+= del_schedule[t][p] == schedule[t+1][p] - schedule[t][p]
             problem += del_schedule[t][p] >= ramping_down[p]  
             problem +=  del_schedule[t][p]<= ramping_up[p] 
-    
-        
+            
 
     # Constraint 2 -  technical Minimum
-    for t in range(num_hours):
+    for t in range(num_slots):
         for p in range(num_plants):
             problem += schedule[t][p]>=technical_minimum[p]*availability.iloc[t,p]
 
 
-
     #Constraint 3 - Total generation in slot i = Total demand in slot i - IEX market power - Battery discharge        
-    for t in range(num_hours):
+    for t in range(num_slots):
         problem += lpSum(schedule[t][p] for p in range(num_plants)) ==optimised_demand[t]-re.iloc[t,:].sum()-market_drawl[t]-b_soc[t]+b_soc[t+1]
         # problem += lpSum(schedule[t][p] for p in range(num_plants)) ==optimised_demand[t]-re.iloc[t,:].sum()-market_drawl[t]
         
     #Constraint 4 - Generation should not exceed capacity
-    for t in range(num_hours):
+    for t in range(num_slots):
         for p in range(num_plants):
             problem += schedule[t][p] <= ppa['Capacity'][p]*availability.iloc[t,p]
    
             
     #constraint 5 - sales in market power should be less than market limit set 
-    for t in range(num_hours):
+    for t in range(num_slots):
         problem +=market_drawl[t] >= -1*market_limit
         # problem +=market_drawl[t] >= 0
     
-    for t in range(num_hours):
+    for t in range(num_slots):
         problem +=market_drawl[t] <= 1*market_limit
         
         
     #constraint 6 - battery charging and discharging constriants
 
-    for t in range(num_hours):
-        problem +=b_power[t] ==b_soc[t+1]-b_soc[t]
+    for t in range(num_slots):
+        problem +=b_power[t] ==(b_soc[t+1]-b_soc[t])*(daily_slots/24)
 
     #constraint 7 - Optimised demand should be equal to net demand after DR and DF
-    for t in range(num_hours):
+    for t in range(num_slots):
         problem += optimised_demand[t] <= (1+flexibility)*demand.iloc[t,0]
         problem += optimised_demand[t] >= (1-flexibility)*demand.iloc[t,0]
 
     #constraint 8 - total shift for calculating inconvinience cost
-    for t in range(num_hours):
+    for t in range(num_slots):
         problem += total_shift[t]>=demand.iloc[t,0] - optimised_demand[t]
         problem += total_shift[t]>=-demand.iloc[t,0] + optimised_demand[t]
 
     
 
-    num_days = 365
+    num_days = num_slots//daily_slots
     for d in range(num_days):
             problem += lpSum(optimised_demand[t+d*daily_slots] for t in range(daily_slots)) ==demand[d*daily_slots:(d+1)*daily_slots].sum()
-            problem += lpSum(total_shift[t+d*daily_slots] for t in range(daily_slots)) <= 0.005*demand[d*daily_slots:(d+1)*daily_slots].sum()
+            problem += lpSum(total_shift[t+d*daily_slots] for t in range(daily_slots)) <= max_daily_shift*demand[d*daily_slots:(d+1)*daily_slots].sum()
     # Solve the problem
     problem.solve()
 
@@ -145,14 +142,14 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
  #______________________________________________________________________________________________________   
     # saving variable values in dataframe
 
-    schedule_gen = pd.DataFrame(index=range(num_hours), columns=range(num_plants))
-    market_power = pd.DataFrame(index=range(num_hours))
-    battery_profile = pd.DataFrame(index=range(num_hours))
-    batt_soc=pd.DataFrame(index=range(num_hours))
-    opt_demand=pd.DataFrame(index=range(num_hours))
+    schedule_gen = pd.DataFrame(index=range(num_slots), columns=range(num_plants))
+    market_power = pd.DataFrame(index=range(num_slots))
+    battery_profile = pd.DataFrame(index=range(num_slots))
+    batt_soc=pd.DataFrame(index=range(num_slots))
+    opt_demand=pd.DataFrame(index=range(num_slots))
    
    
-    for t in range(num_hours):
+    for t in range(num_slots):
         for p in range(num_plants):
             schedule_gen.at[t, p] = schedule[t][p].varValue
         market_power.at[t,0] = market_drawl[t].varValue
@@ -160,10 +157,10 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
         opt_demand.at[t,0]=optimised_demand[t].varValue
 
         
-    for t in range(num_hours):
+    for t in range(num_slots):
         battery_profile.at[t,0]=b_power[t].varValue
     
-    battery_energy_cost = -1.3*battery_profile*(battery_profile<0)
+    battery_energy_cost = 3*battery_profile*(battery_profile>0)
     
     # dataframe to csv
     gen_schedule_path = os.path.join(OUTPUT_PATH,output_folder_name,"Generation schedules")
@@ -177,12 +174,12 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
     re_cost = solar*solar_pu_cost + wind*wind_pu_cost
     market_cost = market_power.iloc[:,0]*market_price.iloc[:,0]
   
-    # total_generation_cost = np.dot(np.array(schedule_gen.iloc[:,:]),np.array(Variable_cost[:])) + re_cost +market_cost
-    total_generation_cost = np.dot(np.array(schedule_gen.iloc[:,:]),np.array(Variable_cost[:])) +market_cost
+    total_generation_cost = (10**-3)*(24/daily_slots)*(np.dot(np.array(schedule_gen.iloc[:,:]),np.array(Variable_cost[:])) + re_cost +market_cost+battery_energy_cost.sum(axis=1))
+    # total_generation_cost = np.dot(np.array(schedule_gen.iloc[:,:]),np.array(Variable_cost[:])) +market_cost
     
     sch_gen = schedule_gen.iloc[:,:].sum(axis=1)
  
-    per_unit_generation_cost = total_generation_cost/(opt_demand.iloc[:,0]+market_power.iloc[:,0])
+    per_unit_generation_cost = 10**3*total_generation_cost/(opt_demand.iloc[:,0]+market_power.iloc[:,0]-battery_profile.iloc[:,0])
     # per_unit_generation_cost = total_generation_cost/(projected_demand['demand'])
     end_time= time.time()
     
