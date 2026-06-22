@@ -24,22 +24,9 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
 
-st.title("Consumer demand analysis for high-cost periods")
+st.title("Overview of generation scheduling and ")
 
                 
-uploaded_meter_file = st.file_uploader(
-    "Upload meter data file (.csv)",
-    type=["csv"],
-    help="CSV file with columns as meter IDs and rows as time slots"
-)
-
-if uploaded_meter_file is not None:
-    st.session_state["consumer_data"] = pd.read_csv(uploaded_meter_file)
-    st.success("Meter data loaded successfully!")
-
-# st.session_state["consumer_data"] = None
-from  analyze_high_cost_contributors import analyze_high_cost_contributors
-
 
 c1,c2 = st.columns([1,4])
 with c1:
