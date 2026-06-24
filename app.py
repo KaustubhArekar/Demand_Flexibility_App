@@ -33,7 +33,7 @@ with st.sidebar:
         "Demand Data": "demand.csv",
         "Market Rates": "market_rate.xlsx",
         "Renewable Energy": "RE.xlsx",
-        "Input Parameters": "input_parameters.csv",
+        # "Input Parameters": "input_parameters.csv",
         "Generator availability": "availability.xlsx"
     }
 
@@ -41,59 +41,145 @@ with st.sidebar:
     for label, filename in file_configs.items():
         uploaded_data[label] = st.file_uploader(f"Upload {filename}", type=['csv', 'xlsx'], key=label)
 
+
+
+
 # --- 2. Data Processing Logic ---
 # Check if all files are uploaded
-if all(uploaded_data.values()):
-    if st.sidebar.button("⚙️ Process & Initialize Data"):
-        try:
-            # Read Dataframes from memory
-            ppa = pd.read_excel(uploaded_data["Generation Stack"])
-            projected_demand = pd.read_csv(uploaded_data["Demand Data"])
-            market_price = pd.read_excel(uploaded_data["Market Rates"])
-            re = pd.read_excel(uploaded_data["Renewable Energy"])
-            input_parameters = pd.read_csv(uploaded_data["Input Parameters"])
-            availability= pd.read_excel(uploaded_data["Generator availability"])
 
-            # Helper to extract values from the parameters dataframe
-            def get_param(p_name):
-                return input_parameters[input_parameters['Parameter'] == p_name]['Value'].values[0]
-
-            # Store processed variables in st.session_state
-            st.session_state['ppa'] = ppa
-            st.session_state['demand'] = projected_demand
-            st.session_state['market'] = market_price
-            st.session_state['re'] = re
-            st.session_state['availability'] = availability
-
-            # Parsing specific variables
-            st.session_state['flex'] = ast.literal_eval(get_param('flexibility'))
-            # st.session_state['base_incenitve_DF'] = float(get_param('base_incenitve_DF'))
-            # st.session_state['base_incenitve_DR'] = float(get_param('base_incenitve_DR'))
-            st.session_state['battery_energy_capacity'] = float(get_param('battery_energy_capacity'))
-            # st.session_state['clusters_rqd'] = ast.literal_eval(get_param('clusters_rqd'))
-            st.session_state['num_slots'] = int(len(st.session_state['demand']))
-            # st.session_state['mode'] = ast.literal_eval(get_param('mode'))
-            # st.session_state['inconvenience_cost'] = ast.literal_eval(get_param('inconvenience_cost'))
-            st.session_state['output_folder_name'] = get_param('Output Folder Name')
-            st.session_state['solar_pu_cost'] = float(get_param('solar_pu_cost'))
-            st.session_state['wind_pu_cost'] = float(get_param('wind_pu_cost'))
-            st.session_state['market_limit'] = float(get_param('market_limit'))
-            st.session_state['battery_power_capacity'] = float(get_param('battery_power_capacity'))
-            st.session_state['battery_initial_state'] = float(get_param('battery_initial_state'))
-            st.session_state['Re_forecast'] = ast.literal_eval(get_param('RE_forecasting'))
-            st.session_state['Daily_slots'] = int(float(get_param('daily_slots')))
-            st.session_state['max_daily_shift'] = float(get_param('limit_on_totalshift'))
-
-            st.sidebar.success("Data successfully initialized!")
-
-        except Exception as e:
-            st.sidebar.error(f"Error parsing files: {e}")
 
 # --- 3. Using Data for Analysis/Plotting ---
 st.title("Demand Flexibility Analysis Model")
 st.write("The Demand Flexibility Analysis Model is a specialized analytical tool designed to evaluate the economic and operational impact of demand-side management on power systems by processing multi-faceted data inputs—including Power Purchase Agreements (PPA), projected demand, renewable energy availability, and market rates—the underlying model calculates the total generation cost across various flexibility levels. The dashboard enables users to visualize demand modulation and determine per-unit savings derived from Demand Flexibility (DF) and Demand Response (DR) initiatives. Furthermore, it integrates external IEX market data, such as Day-Ahead Market (DAM) and Real-Time Market (RTM) trends, to benchmark internal costs against market prices. For granular insights, the model identifies high-cost periods and analyzes consumer meter data to pinpoint specific contributors to peak generation costs, helping stakeholders optimize demand patterns for maximum financial efficiency.")
-c1,c2=st.columns([2,3])
 
+
+st.divider()
+st.subheader("⚙️ Model Parameters")
+
+with st.expander("Configure model parameters before running analysis", expanded=True):
+
+    col_a, col_b, col_c = st.columns(3)
+
+    with col_a:
+        st.markdown("**🔀 Flexibility Levels**")
+        flex_min  = st.slider("Min flexibility",  0.0,  0.30, 0.0,  step=0.01, format="%.2f", key="flex_min")
+        flex_max  = st.slider("Max flexibility",  0.0,  0.30, 0.20, step=0.01, format="%.2f", key="flex_max")
+        flex_step = st.slider("Step size",        0.01, 0.10, 0.05, step=0.01, format="%.2f", key="flex_step")
+        flex_list = list(np.round(np.arange(flex_min, flex_max + flex_step / 2, flex_step), 2).tolist())
+        if 0.0 not in flex_list:
+            flex_list = [0.0] + flex_list
+        st.caption(f"Levels to simulate: `{flex_list}`")
+
+        st.markdown("**🕐 Time Resolution**")
+        daily_slots = st.selectbox(
+            "Slots per day",
+            options=[24, 48, 96], index=0,
+            help="24 = hourly, 48 = 30-min, 96 = 15-min",
+            key="daily_slots_input"
+        )
+
+        st.markdown("**📁 Output**")
+        output_folder_name = st.text_input(
+            "Output folder name", value="Run_1",
+            help="Subfolder name for saving generation schedule CSVs",
+            key="output_folder_input"
+        )
+
+    with col_b:
+        st.markdown("**☀️ Renewable Energy Costs**")
+        solar_pu_cost = st.number_input(
+            "Solar cost (₹/kWh)", min_value=0.0, max_value=20.0,
+            value=2.2, step=0.2, key="solar_cost"
+        )
+        wind_pu_cost = st.number_input(
+            "Wind cost (₹/kWh)", min_value=0.0, max_value=20.0,
+            value=3.0, step=0.2, key="wind_cost"
+        )
+
+        st.markdown("**🏦 IEX Market**")
+        market_limit = st.number_input(
+            "Market purchase/sale limit (MW)", min_value=0.0,
+            max_value=50000.0, value=500.0, step=100.0, key="market_limit_input"
+        )
+
+        st.markdown("**🔄 RE Forecasting**")
+        Re_forecast = st.toggle(
+            "Use RE forecast from forecasting module",
+            value=False,
+            help="If ON, uses the output from the RE Forecasting page instead of the uploaded RE.xlsx",
+            key="re_forecast_toggle"
+        )
+        if Re_forecast and "RE_forecast_output" not in st.session_state:
+            st.warning("⚠️ No RE forecast found. Run the RE Forecasting page first, or turn this off.")
+
+    with col_c:
+        st.markdown("**🔋 Battery (BESS)**")
+        battery_energy_capacity = st.number_input(
+            "Energy capacity (MWh)", min_value=0.0, max_value=10000.0,
+            value=100.0, step=10.0, key="batt_energy"
+        )
+        battery_power_capacity = st.number_input(
+            "Power capacity (MW)", min_value=0.0, max_value=5000.0,
+            value=25.0, step=5.0, key="batt_power"
+        )
+        battery_initial_state = st.number_input(
+            "Initial SoC (MWh)", min_value=0.0,
+            max_value=float(battery_energy_capacity),
+            value=min(50.0, float(battery_energy_capacity)),
+            step=5.0, key="batt_soc"
+        )
+
+        st.markdown("**📊 Demand Shift Constraint**")
+        max_daily_shift = st.slider(
+            "Max daily shift (fraction of daily demand)",
+            min_value=0.001, max_value=0.050,
+            value=0.005, step=0.001, format="%.3f",
+            help="Caps total load shifted per day — controls consumer inconvenience",
+            key="max_shift"
+        )
+
+
+c1, c2 = st.columns([1, 4])
+with c1:
+    if st.button("⚙️ Process & Initialize Data"):
+        try:
+            ppa              = pd.read_excel(uploaded_data["Generation Stack"])
+            projected_demand = pd.read_csv(uploaded_data["Demand Data"])
+            market_price     = pd.read_excel(uploaded_data["Market Rates"])
+            availability     = pd.read_excel(uploaded_data["Generator availability"])
+
+            if st.session_state.get("re_forecast_toggle") and "RE_forecast_output" in st.session_state:
+                re = st.session_state["RE_forecast_output"]
+                st.info("Using RE forecast from forecasting module.")
+            else:
+                re = pd.read_excel(uploaded_data["Renewable Energy"])
+
+            st.session_state['ppa']                     = ppa
+            st.session_state['demand']                  = projected_demand
+            st.session_state['market']                  = market_price
+            st.session_state['re']                      = re
+            st.session_state['availability']            = availability
+            st.session_state['flex']                    = flex_list
+            st.session_state['battery_energy_capacity'] = battery_energy_capacity
+            st.session_state['battery_power_capacity']  = battery_power_capacity
+            st.session_state['battery_initial_state']   = battery_initial_state
+            st.session_state['solar_pu_cost']           = solar_pu_cost
+            st.session_state['wind_pu_cost']            = wind_pu_cost
+            st.session_state['market_limit']            = market_limit
+            st.session_state['Re_forecast']             = Re_forecast
+            st.session_state['Daily_slots']             = int(daily_slots)
+            st.session_state['num_slots']               = int(len(projected_demand))
+            st.session_state['output_folder_name']      = output_folder_name
+            st.session_state['max_daily_shift']         = max_daily_shift
+
+            st.success("Data successfully initialized!")
+
+        except Exception as e:
+            st.error(f"Error parsing files: {e}")
+
+st.divider()
+
+c1,c2=st.columns([2,3])
 with c1:
     
 

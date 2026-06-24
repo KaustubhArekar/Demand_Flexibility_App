@@ -27,6 +27,7 @@ from iex_data import scrape_date_range
 import datetime as dt
 
 st.title("IEX Market MCP Data trend")
+st.subheader("This feature works only on local machine. It will not work on Streamlit cloud due to IEX data access restrictions.")
 
 if st.button("Load IEX market data", use_container_width=True):
     todays_date = dt.date.today()
