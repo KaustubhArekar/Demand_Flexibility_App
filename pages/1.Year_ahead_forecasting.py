@@ -710,7 +710,7 @@ if forecast_file is not None:
             buf_xl = io.BytesIO()
             with pd.ExcelWriter(buf_xl, engine="openpyxl") as writer:
                 fc_df.to_excel(writer, index=False, sheet_name="Forecast")
-                pd.DataFrame(monthly_rows).to_excel(writer, index=False, sheet_name="Monthly Summary") if len(fc_pred) == 8760 else None
+                pd.DataFrame(monthly_rows).to_excel(writer, index=False, sheet_name="Monthly Summary") 
             st.download_button(
                 "⬇️ Download forecast Excel",
                 data=buf_xl.getvalue(),

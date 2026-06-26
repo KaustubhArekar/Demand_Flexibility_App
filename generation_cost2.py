@@ -179,7 +179,7 @@ def generation_cost2(flexibility, demand, re, market_price, ppa, battery_energy_
     
     sch_gen = schedule_gen.iloc[:,:].sum(axis=1)
  
-    per_unit_generation_cost = 10**3*total_generation_cost/(opt_demand.iloc[:,0]+market_power.iloc[:,0]-battery_profile.iloc[:,0])
+    per_unit_generation_cost = 10**3*total_generation_cost/(opt_demand.iloc[:,0]+market_power.iloc[:,0])
     # per_unit_generation_cost = total_generation_cost/(projected_demand['demand'])
     end_time= time.time()
     

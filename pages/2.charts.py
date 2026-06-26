@@ -43,7 +43,7 @@ with c11:
                st.session_state["Demand_modulation"] = pd.DataFrame(index=range(st.session_state.num_slots), columns=st.session_state.flex)
                for i in range(st.session_state.num_slots):
                     for flex in range(len(st.session_state.flex)):
-                        st.session_state["Demand_modulation"].iloc[i,flex] = st.session_state["opt_demand"].iloc[i, 0] - st.session_state["opt_demand"].iloc[i, flex]
+                        st.session_state["Demand_modulation"].iloc[i,flex] = (st.session_state["opt_demand"].iloc[i, 0] +st.session_state["Battery"].iloc[i, 0]) - (st.session_state["opt_demand"].iloc[i, flex] + st.session_state["Battery"].iloc[i, flex])
                         if st.session_state["Demand_modulation"].iloc[i, flex]> 0.01*st.session_state["opt_demand"].iloc[i, 0]:
                             st.session_state["DF_pu_savings"].iloc[i, flex] = (st.session_state["total_cost_flex"].iloc[i, 0] - st.session_state["total_cost_flex"].iloc[i, flex])/st.session_state["Demand_modulation"].iloc[i, flex]
                         elif st.session_state["Demand_modulation"].iloc[i, flex] < -0.01*st.session_state["opt_demand"].iloc[i, 0]:

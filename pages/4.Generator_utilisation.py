@@ -74,7 +74,7 @@ if selected_flex is not None:
          st.write(f"Type: {st.session_state['ppa'].loc[st.session_state['ppa']['Plant'] == selected_gen, 'Type'].values[0]}")
    with m2:
       
-      if selected_flex and selected_gen is not None:
+      if selected_gen is not None:
          num_slots = st.session_state["generator_contribution"].shape[0]
          daily_slots = st.session_state['Daily_slots']
          savings_matrix= pd.DataFrame(columns=range(num_slots//daily_slots), index=range(daily_slots))

@@ -62,38 +62,36 @@ with st.expander("Configure model parameters before running analysis", expanded=
 
     with col_a:
         st.markdown("**🔀 Flexibility Levels**")
-        flex_min  = st.slider("Min flexibility",  0.0,  0.30, 0.0,  step=0.01, format="%.2f", key="flex_min")
-        flex_max  = st.slider("Max flexibility",  0.0,  0.30, 0.20, step=0.01, format="%.2f", key="flex_max")
-        flex_step = st.slider("Step size",        0.01, 0.10, 0.05, step=0.01, format="%.2f", key="flex_step")
+        flex_min  = st.slider("Min flexibility",  0.0,  0.30, 0.0,  step=0.01, format="%.2f", key="flex_min",help ="Minimum flexibility level to simulate. Represents the lowest fraction of demand that can be shifted or modulated.")
+        flex_max  = st.slider("Max flexibility",  0.0,  0.30, 0.20, step=0.01, format="%.2f", key="flex_max", help ="Maximum flexibility level to simulate. Represents the highest fraction of demand that can be shifted or modulated.")
+        flex_step = st.slider("Step size",        0.01, 0.10, 0.05, step=0.01, format="%.2f", key="flex_step", help ="Step size for flexibility levels. Determines the granularity of flexibility levels to be simulated between the minimum and maximum values.")
         flex_list = list(np.round(np.arange(flex_min, flex_max + flex_step / 2, flex_step), 2).tolist())
         if 0.0 not in flex_list:
             flex_list = [0.0] + flex_list
         st.caption(f"Levels to simulate: `{flex_list}`")
 
-        st.markdown("**🕐 Time Resolution**")
-        daily_slots = st.selectbox(
-            "Slots per day",
-            options=[24, 48, 96], index=0,
-            help="24 = hourly, 48 = 30-min, 96 = 15-min",
-            key="daily_slots_input"
+        st.markdown("**Energy Shift Constraint**")
+        max_daily_shift = st.slider(
+            "Max daily shift (fraction of daily energy demand)",
+            min_value=0.001, max_value=0.050,
+            value=0.005, step=0.001, format="%.3f",
+            help="Caps total energy shifted per day",
+            key="max_shift"
         )
-
-        st.markdown("**📁 Output**")
-        output_folder_name = st.text_input(
-            "Output folder name", value="Run_1",
-            help="Subfolder name for saving generation schedule CSVs",
-            key="output_folder_input"
-        )
+        
+        
+        
+        
 
     with col_b:
         st.markdown("**☀️ Renewable Energy Costs**")
         solar_pu_cost = st.number_input(
-            "Solar cost (₹/kWh)", min_value=0.0, max_value=20.0,
-            value=2.2, step=0.2, key="solar_cost"
+            "Solar cost(₹/kWh)", min_value=0.0, max_value=20.0,
+            value=2.2, step=0.2, key="solar_cost", help = 'Weighted average cost of solar plants'
         )
         wind_pu_cost = st.number_input(
             "Wind cost (₹/kWh)", min_value=0.0, max_value=20.0,
-            value=3.0, step=0.2, key="wind_cost"
+            value=3.0, step=0.2, key="wind_cost", help = 'Weighted average cost of wind plants'
         )
 
         st.markdown("**🏦 IEX Market**")
@@ -129,13 +127,19 @@ with st.expander("Configure model parameters before running analysis", expanded=
             step=5.0, key="batt_soc"
         )
 
-        st.markdown("**📊 Demand Shift Constraint**")
-        max_daily_shift = st.slider(
-            "Max daily shift (fraction of daily demand)",
-            min_value=0.001, max_value=0.050,
-            value=0.005, step=0.001, format="%.3f",
-            help="Caps total load shifted per day — controls consumer inconvenience",
-            key="max_shift"
+        st.markdown("**🕐 Time Resolution**")
+        daily_slots = st.selectbox(
+            "Slots per day",
+            options=[24, 48, 96], index=0,
+            help="24 = hourly, 48 = 30-min, 96 = 15-min",
+            key="daily_slots_input"
+        )
+
+        st.markdown("**📁 Output**")
+        output_folder_name = st.text_input(
+            "Output folder name", value="Run_1",
+            help="Subfolder name for saving generation schedule CSVs",
+            key="output_folder_input"
         )
 
 
@@ -144,8 +148,10 @@ with c1:
     if st.button("⚙️ Process & Initialize Data"):
         try:
             ppa              = pd.read_excel(uploaded_data["Generation Stack"])
-            projected_demand = pd.read_csv(uploaded_data["Demand Data"])
-            market_price     = pd.read_excel(uploaded_data["Market Rates"])
+            if 'demand' not in st.session_state:
+                projected_demand = pd.read_csv(uploaded_data["Demand Data"])
+            if 'market' not in st.session_state:
+                market_price     = pd.read_excel(uploaded_data["Market Rates"])
             availability     = pd.read_excel(uploaded_data["Generator availability"])
 
             if st.session_state.get("re_forecast_toggle") and "RE_forecast_output" in st.session_state:
@@ -155,8 +161,10 @@ with c1:
                 re = pd.read_excel(uploaded_data["Renewable Energy"])
 
             st.session_state['ppa']                     = ppa
-            st.session_state['demand']                  = projected_demand
-            st.session_state['market']                  = market_price
+            if 'demand' not in st.session_state:
+                st.session_state['demand']              = projected_demand
+            if 'market' not in st.session_state:
+                st.session_state['market']              = market_price
             st.session_state['re']                      = re
             st.session_state['availability']            = availability
             st.session_state['flex']                    = flex_list
@@ -168,9 +176,10 @@ with c1:
             st.session_state['market_limit']            = market_limit
             st.session_state['Re_forecast']             = Re_forecast
             st.session_state['Daily_slots']             = int(daily_slots)
-            st.session_state['num_slots']               = int(len(projected_demand))
+            st.session_state['num_slots']               = int(len(st.session_state['demand']))
             st.session_state['output_folder_name']      = output_folder_name
             st.session_state['max_daily_shift']         = max_daily_shift
+            st.session_state['peak_demand']             = st.session_state["peak_demand"]
 
             st.success("Data successfully initialized!")
 
