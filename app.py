@@ -179,7 +179,7 @@ with c1:
             st.session_state['num_slots']               = int(len(st.session_state['demand']))
             st.session_state['output_folder_name']      = output_folder_name
             st.session_state['max_daily_shift']         = max_daily_shift
-            st.session_state['peak_demand']             = st.session_state["peak_demand"]
+            # st.session_state['peak_demand']             = st.session_state["peak_demand"]
 
             st.success("Data successfully initialized!")
 

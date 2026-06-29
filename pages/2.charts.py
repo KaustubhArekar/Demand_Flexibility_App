@@ -189,8 +189,8 @@ if "DF_pu_savings" in st.session_state:
 
     # Monthly analysis and visualisation 
     #1. DF/DR needed hourly distribution (Box plot for each month)
-    dfcs1, dfcs2 = st.columns([1,1])
-    with dfcs1:
+    dfcs1,dfcs2,dfcs3 = st.columns([1,6,1])
+    with dfcs2:
         if "DF_pu_savings" in st.session_state:
                     df1 = st.session_state["opt_demand"][selected_flex]
                     df2=st.session_state["opt_demand"][0]
@@ -233,7 +233,45 @@ if "DF_pu_savings" in st.session_state:
 
                     st.plotly_chart(fig, use_container_width=True)
                 
-    with dfcs2:
+    
+
+
+    dc1,dc2= st.columns([1,1])  
+    with dc1:
+            if "Demand_modulation" in st.session_state:
+                savings_matrix_dm = pd.DataFrame(columns=range(num_slots//daily_slots), index=range(daily_slots))
+                data = st.session_state["Demand_modulation"][selected_flex]
+
+                # data =st.session_state['pu_gen_cost_flex'][0].values - st.session_state['pu_gen_cost_flex'][selected_flex].values
+                # data =st.session_state['pu_gen_cost_flex'][selected_flex].values
+                for i in range(num_slots//daily_slots):
+                    start_idx = i * daily_slots
+                    end_idx = (i + 1) * daily_slots
+
+                    if end_idx <= len(data):
+                        savings_matrix_dm.iloc[:, i] = data[start_idx:end_idx]
+
+
+
+                fig12 = go.Figure(data=go.Heatmap(
+                z=savings_matrix_dm.T.values,
+                colorscale='Viridis',  # You can change this: 'Plasma', 'Inferno', 'Hot', etc.
+                colorbar=dict(title="(MW)")
+                ))
+            
+            
+                fig12.update_layout(
+                title='Heat Map: Change in demand due to DF/DR',
+                xaxis_title='Time Slots (Hours)',
+                yaxis_title='Day of Year',
+                height=500,
+                width=900,
+                template='plotly_white'
+                )
+
+                st.plotly_chart(fig12, use_container_width=True)
+
+    with dc2:
                 savings_matrix = pd.DataFrame(columns=range(num_slots//daily_slots), index=range(daily_slots))
                 data = (10**3)*st.session_state["DF_pu_savings"][selected_flex]
 
@@ -248,14 +286,14 @@ if "DF_pu_savings" in st.session_state:
 
 
 
-                fig12 = go.Figure(data=go.Heatmap(
+                fig13 = go.Figure(data=go.Heatmap(
                 z=savings_matrix.T.values,
                 colorscale='Viridis',  # You can change this: 'Plasma', 'Inferno', 'Hot', etc.
                 colorbar=dict(title="(INR/kWh)")
                 ))
             
             
-                fig12.update_layout(
+                fig13.update_layout(
                 title='Heat Map: Change in generation cost per unit DF/DR',
                 xaxis_title='Time Slots (Hours)',
                 yaxis_title='Day of Year',
@@ -274,4 +312,4 @@ if "DF_pu_savings" in st.session_state:
                 # )
             
             # Display in Streamlit
-                st.plotly_chart(fig12, use_container_width=True)
+                st.plotly_chart(fig13, use_container_width=True)
